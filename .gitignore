@@ -1,0 +1,32 @@
+# .gitignore
+
+# Entorno virtual
+.venv/
+
+
+
+# Archivos de caché de Python
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos temporales
+*.tmp
+
+# Directorios de IDEs
+.vscode/
+.idea/
+
+# Archivos de base de datos locales
+*.mdf
+*.ldf
+
+# Otros archivos que no deberían ser versionados
+*.bak
+*.swp
