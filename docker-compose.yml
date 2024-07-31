@@ -5,7 +5,7 @@ services:
     image: mcr.microsoft.com/mssql/server:2019-latest
     environment:
       - ACCEPT_EULA=Y
-      - SA_PASSWORD=password123
+      - SA_PASSWORD=${SQLSERVER_PASSWORD}
       - MSSQL_PID=Developer
     ports:
       - "1433:1433"
@@ -20,12 +20,13 @@ services:
       - "5000:5000"
     environment:
       - FLASK_APP=app.py
-      - DATABASE_URL=sqlserver://sa:password123@sqlserver:1433/master
+      - FLASK_RUN_HOST=0.0.0.0
+      - FLASK_RUN_PORT=5000
+      - DATABASE_URL=sqlserver://${SQLSERVER_USER}:${SQLSERVER_PASSWORD}@${SQLSERVER_HOST}:${SQLSERVER_PORT}/${SQLSERVER_DB}
     depends_on:
       - sqlserver
     networks:
       - app-network
-
 volumes:
   sqlserver_data:
 
