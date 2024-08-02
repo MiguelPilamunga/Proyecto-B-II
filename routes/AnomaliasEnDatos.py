@@ -18,7 +18,7 @@ def get_connection_string(request):
 @anomalia_en_datos.route('/check_anomalies', methods=['POST'])
 def check_anomalies():
     connection_string = get_connection_string(request)
-
+    print(connection_string)
     try:
         engine = create_engine(connection_string)
         anomalies, logs = check_data_anomalies(engine)

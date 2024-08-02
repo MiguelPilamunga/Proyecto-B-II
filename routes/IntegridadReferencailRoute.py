@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from services.IntegridadReferencialService import check_integridad_referencial
 
-integridad_referencial = Blueprint('integridad_referencial', __name__, url_prefix='/integridad_referencialgi')
+integridad_referencial = Blueprint('integridad_referencial', __name__, url_prefix='/integridad_referencial')
 
 def get_connection_string(request):
     server = request.form.get('server')
@@ -17,7 +17,7 @@ def get_connection_string(request):
 @integridad_referencial.route('/check', methods=['POST'])
 def check_integridad():
     connection_string = get_connection_string(request)
-
+    print(connection_string)
     try:
         engine = create_engine(connection_string)
         result, error = check_integridad_referencial(engine)
