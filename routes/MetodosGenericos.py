@@ -6,6 +6,10 @@ from services.IntegridadService import IntegridadReferencialService
 
 integridad = Blueprint('integridad', __name__, url_prefix='/integridad')
 
+def validate_connection_params(server, database, username, password):
+    if any(param is None or param.strip() == '' for param in [server, database, username, password]):
+        return False
+    return True
 
 @integridad.route('/check', methods=['POST'])
 def check_integrity():
@@ -14,8 +18,17 @@ def check_integrity():
     username = request.form.get('username')
     password = request.form.get('password')
 
-    connection_string = f"mssql+pymssql://{username}:{password}@{server}/{database}"
+    if not validate_connection_params(server, database, username, password):
+        return jsonify({
+            "status": "error",
+            "message": "Faltan datos de conexión o algunos datos son inválidos.",
+            "resultados": {}
+        }), 400
 
+    connection_string = f"mssql+pymssql://{username}:{password}@{server}/{database}"
+    print(f"Cadena de conexión: {connection_string}") 
+    
+    
     try:
         engine = create_engine(connection_string)
         servicio = IntegridadReferencialService(engine)

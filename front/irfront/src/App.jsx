@@ -1,165 +1,144 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const App = () => {
-  const [formData, setFormData] = useState({
-    server: '',
-    database: '',
-    username: '',
-    password: '',
-    port: ''
-  });
-  const [tableData, setTableData] = useState({});
-  const [integrityResults, setIntegrityResults] = useState([]);
+const AuditForm = () => {
+  const [server, setServer] = useState('');
+  const [database, setDatabase] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [noData, setNoData] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setLoading(true);
-    setError('');
-    setNoData(false);
-
-    // Limpiar los resultados anteriores
-    setTableData({});
-    setIntegrityResults([]);
+    setError(null);
+    setResult(null);
 
     try {
-      const response = await axios.post('http://localhost:5000/test-db', formData);
-      if (response.data.error) {
-        setNoData(true);
-      } else {
-        setTableData(response.data.table_data);
-        setIntegrityResults(response.data.integrity_results);
-      }
-    } catch (error) {
-      setError('Error al conectar con la base de datos.');
+      const response = await axios.post('http://localhost:5000/integridad/check', new URLSearchParams({
+        server,
+        database,
+        username,
+        password
+      }).toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+
+      setResult(response.data);
+    } catch (err) {
+      setError('Error al consultar la integridad de la base de datos.');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div>
-      <h1>Auditoría de Base de Datos</h1>
+  const renderResults = () => {
+    if (!result) return null;
 
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Server:</label>
-          <input
-            type="text"
-            name="server"
-            value={formData.server}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        <div>
-          <label>Database:</label>
-          <input
-            type="text"
-            name="database"
-            value={formData.database}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        <div>
-          <label>Username:</label>
-          <input
-            type="text"
-            name="username"
-            value={formData.username}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        <div>
-          <label>Password:</label>
-          <input
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        <div>
-          <label>Port:</label>
-          <input
-            type="text"
-            name="port"
-            value={formData.port}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        <button type="submit">Auditar</button>
-      </form>
+    const { status, message, total_violations, violation_summary, detailed_results } = result;
 
-      {loading && <p>Cargando...</p>}
-      {error && <p>{error}</p>}
-      {noData && <p>Base de datos no encontrada o datos incorrectos.</p>}
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-        <div style={{ flex: 1, marginRight: '10px', overflow: 'auto' }}>
-          <h2>Datos de Tablas</h2>
-          {Object.keys(tableData).length > 0 ? (
-            Object.keys(tableData).map((table) => (
-              <div key={table}>
-                <h3>{table}</h3>
-                <table border="1" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      {tableData[table].length > 0 &&
-                        Object.keys(tableData[table][0]).map((key) => (
-                          <th key={key} style={{ padding: '8px', border: '1px solid black' }}>{key}</th>
-                        ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableData[table].map((row, index) => (
-                      <tr key={index}>
-                        {Object.values(row).map((value, idx) => (
-                          <td key={idx} style={{ padding: '8px', border: '1px solid black' }}>{value}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ))
-          ) : (
-            <p>No se encontraron datos para mostrar.</p>
-          )}
-        </div>
-
-        <div style={{ flex: 1, marginLeft: '10px', overflow: 'auto' }}>
-          <h2>Resultados de Integridad Referencial</h2>
-          {integrityResults.length > 0 ? (
+    return (
+      <div>
+        <h2>Resultado de la Auditoría</h2>
+        <p>Status: {status}</p>
+        <p>Message: {message}</p>
+        <p>Total Violations: {total_violations}</p>
+        {violation_summary && violation_summary.length > 0 && (
+          <ul>
+            {violation_summary.map((explanation, index) => (
+              <li key={index}>{explanation}</li>
+            ))}
+          </ul>
+        )}
+        <h3>Detalles:</h3>
+        <div>
+          <h4>Violaciones de tipo de datos:</h4>
+          {detailed_results.data_type_mismatch && detailed_results.data_type_mismatch.length > 0 ? (
             <ul>
-              {integrityResults.map((result, index) => (
+              {detailed_results.data_type_mismatch.map((item, index) => (
                 <li key={index}>
-                  <strong>Tabla:</strong> {result.table}, <strong>Clave Foránea:</strong> {result.foreign_key}, 
-                  <strong>Registros Huérfanos:</strong> {result.result.length}
+                  {item.ForeignKeyName} en la tabla {item.TableName} ({item.ColumnName})
+                  - Tipo de dato: {item.ColumnDataType} no coincide con {item.ReferencedColumnDataType} en la tabla {item.ReferencedTableName} ({item.ReferencedColumnName})
                 </li>
               ))}
             </ul>
-          ) : (
-            <p>No se encontraron anomalías.</p>
-          )}
+          ) : <p>No hay violaciones de tipo de datos.</p>}
+        </div>
+        <div>
+          <h4>Claves primarias duplicadas:</h4>
+          {detailed_results.duplicate_primary_keys && detailed_results.duplicate_primary_keys.length > 0 ? (
+            <ul>
+              {detailed_results.duplicate_primary_keys.map((item, index) => (
+                <li key={index}>{item.Issue}: {item.DuplicateCount} duplicados</li>
+              ))}
+            </ul>
+          ) : <p>No hay claves primarias duplicadas.</p>}
+        </div>
+        <div>
+          <h4>Claves foráneas sin índice:</h4>
+          {detailed_results.foreign_keys_without_index && detailed_results.foreign_keys_without_index.length > 0 ? (
+            <ul>
+              {detailed_results.foreign_keys_without_index.map((item, index) => (
+                <li key={index}>{item.TableName} ({item.ColumnName})</li>
+              ))}
+            </ul>
+          ) : <p>No hay claves foráneas sin índice.</p>}
+        </div>
+        <div>
+          <h4>Registros huérfanos:</h4>
+          {detailed_results.orphaned_records && detailed_results.orphaned_records.length > 0 ? (
+            <ul>
+              {detailed_results.orphaned_records.map((item, index) => (
+                <li key={index}>
+                  Tabla Hija: {item.ChildTable} ({item.ChildColumn}) tiene {item.OrphanCount} registros huérfanos sin correspondencia en la Tabla Padre: {item.ParentTable} ({item.ParentColumn})
+                </li>
+              ))}
+            </ul>
+          ) : <p>No hay registros huérfanos.</p>}
+        </div>
+        <div>
+          <h4>Incompatibilidad en nulabilidad:</h4>
+          {detailed_results.nullability_mismatch && detailed_results.nullability_mismatch.length > 0 ? (
+            <ul>
+              {detailed_results.nullability_mismatch.map((item, index) => (
+                <li key={index}>
+                  Clave Foránea: {item.ForeignKeyName} en la tabla {item.TableName} ({item.ColumnName}) tiene una nulabilidad que no coincide con la columna referenciada {item.ReferencedColumnName} en la tabla {item.ReferencedTableName}
+                </li>
+              ))}
+            </ul>
+          ) : <p>No hay incompatibilidad en nulabilidad.</p>}
         </div>
       </div>
-    </div>
+    );
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <h2>Formulario de Auditoría de Integridad</h2>
+      <div>
+        <label>Servidor:</label>
+        <input type="text" value={server} onChange={(e) => setServer(e.target.value)} />
+      </div>
+      <div>
+        <label>Base de Datos:</label>
+        <input type="text" value={database} onChange={(e) => setDatabase(e.target.value)} />
+      </div>
+      <div>
+        <label>Usuario:</label>
+        <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} />
+      </div>
+      <div>
+        <label>Contraseña:</label>
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+      </div>
+      <button type="submit" disabled={loading}>Enviar</button>
+      {loading && <p>Cargando...</p>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {renderResults()}
+    </form>
   );
 };
 
-export default App;
+export default AuditForm;
