@@ -2,10 +2,9 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 
-from services.IntegridadService import get_integrity_violations
+from services.IntegridadService import IntegridadReferencialService
 
 integridad = Blueprint('integridad', __name__, url_prefix='/integridad')
-
 
 
 @integridad.route('/check', methods=['POST'])
@@ -14,45 +13,41 @@ def check_integrity():
     database = request.form.get('database')
     username = request.form.get('username')
     password = request.form.get('password')
-    tabla_hija = request.form.get('tabla_hija')
-    tabla_padre = request.form.get('tabla_padre')
 
     connection_string = f"mssql+pymssql://{username}:{password}@{server}/{database}"
 
     try:
         engine = create_engine(connection_string)
-        violations = get_integrity_violations(engine, tabla_hija, tabla_padre)
+        servicio = IntegridadReferencialService(engine)
 
-        if not violations:
-            return jsonify({
-                "status": "error",
-                "message": f"No se encontró una clave foránea de {tabla_hija} a {tabla_padre}",
-                "violations": {}
-            }), 400
+        resultados = servicio.run_all_checks()
 
-        total_violations = sum(v["total_violations"] for v in violations.values())
+        violation_summary = []
+        total_violations = 0
 
-        if total_violations > 0:
-            return jsonify({
-                "status": "warning",
-                "message": f"Se encontraron violaciones de integridad referencial entre '{tabla_hija}' y '{tabla_padre}'",
-                "violations": violations,
-                "total_violations": total_violations
-            }), 200
-        else:
-            return jsonify({
-                "status": "success",
-                "message": f"La integridad referencial entre {tabla_hija} y {tabla_padre} está intacta.",
-                "violations": violations,
-                "total_violations": 0
-            }), 200
+        for check_name, result in resultados.items():
+            if isinstance(result, list) and result:
+                total_violations += len(result)
+                violation_summary.append(resultados.get(f"{check_name}_explanation", ""))
+
+        status = "warning" if total_violations > 0 else "success"
+        message = "Se encontraron violaciones de integridad referencial" if total_violations > 0 else "La integridad referencial está intacta"
+
+        return jsonify({
+            "status": status,
+            "message": message,
+            "total_violations": total_violations,
+            "violation_summary": violation_summary,
+            "detailed_results": resultados
+        }), 200
 
     except SQLAlchemyError as e:
         return jsonify({
             "status": "error",
             "message": f"Error de base de datos: {str(e)}",
-            "violations": {}
+            "resultados": {}
         }), 500
+
 
 @integridad.route('/count_violations', methods=['POST'])
 def count_integrity_violations():
@@ -60,29 +55,23 @@ def count_integrity_violations():
     database = request.form.get('database')
     username = request.form.get('username')
     password = request.form.get('password')
-    tabla_hija = request.form.get('tabla_hija')
-    tabla_padre = request.form.get('tabla_padre')
 
     connection_string = f"mssql+pymssql://{username}:{password}@{server}/{database}"
 
     try:
         engine = create_engine(connection_string)
-        violations = get_integrity_violations(engine, tabla_hija, tabla_padre)
+        servicio = IntegridadReferencialService(engine)
 
-        if not violations:
-            return jsonify({
-                "status": "error",
-                "message": f"No se encontró una clave foránea de {tabla_hija} a {tabla_padre}",
-                "total_violations": 0
-            }), 400
+        resultados = servicio.run_all_checks()
 
-        total_violations = sum(v["total_violations"] for v in violations.values())
+        violations_count = {k: len(v) for k, v in resultados.items() if not v.empty}
+        total_violations = sum(violations_count.values())
 
         return jsonify({
             "status": "success",
-            "message": f"Conteo de violaciones de integridad referencial entre {tabla_hija} y {tabla_padre}",
+            "message": "Conteo de violaciones de integridad referencial",
             "total_violations": total_violations,
-            "violations_details": violations
+            "violations_details": violations_count
         }), 200
 
     except SQLAlchemyError as e:
