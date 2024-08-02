@@ -11,6 +11,16 @@ services:
       - "1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
+      - ./SQLSERVER.sql:/scripts/SQLSERVER.sql
+    command: >
+      bash -c '
+      /opt/mssql/bin/sqlservr &
+      sleep 30s &&
+      /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P $$SA_PASSWORD -i /scripts/SQLSERVER.sql &&
+      tail -f /dev/null
+      '
+    networks:
+      - app-network
 
 volumes:
   sqlserver_data:
