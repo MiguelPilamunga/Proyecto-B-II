@@ -11,22 +11,17 @@ services:
       - "1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
+      - ./SQLSERVER.sql:/scripts/SQLSERVER.sql
+    command: >
+      bash -c '
+      /opt/mssql/bin/sqlservr &
+      sleep 30s &&
+      /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P $$SA_PASSWORD -i /scripts/SQLSERVER.sql &&
+      tail -f /dev/null
+      '
     networks:
       - app-network
 
-  app:
-    build: .
-    ports:
-      - "5000:5000"
-    environment:
-      - FLASK_APP=app.py
-      - FLASK_RUN_HOST=0.0.0.0
-      - FLASK_RUN_PORT=5000
-      - DATABASE_URL=sqlserver://${SQLSERVER_USER}:${SQLSERVER_PASSWORD}@${SQLSERVER_HOST}:${SQLSERVER_PORT}/${SQLSERVER_DB}
-    depends_on:
-      - sqlserver
-    networks:
-      - app-network
 volumes:
   sqlserver_data:
 
